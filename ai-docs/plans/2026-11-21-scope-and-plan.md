@@ -15,3 +15,12 @@ troubleshoot.md (symptom trees, safe-check order, "take it in" stop rules), netw
 
 ## Order
 1. tech.py net + disk with fixture tests. 2. backup + restore test, health. 3. SKILL.md + references. 4. evergreen unit, evals with baseline. 5. README with banner, marketplace install, release. Public question on an askwright page near release.
+
+## Goal
+Ship the plugin as scoped below.
+
+## Status
+Done: released 0.1.0 (2026-11-21); see HANDOFF.md.
+
+## Next single action
+See HANDOFF.md.

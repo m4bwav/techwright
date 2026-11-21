@@ -1,6 +1,6 @@
 {
   "name": "techwright",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Home tech support for computers, Wi-Fi and gadgets: symptom to cause with safe checks and a take-it-in stop, Wi-Fi and internet diagnosis, router hardening, a 3-2-1 backup check with a real restore test, drive and system health, dated buying advice and a safe homelab path. Read-only Windows checks in tech.py.",
   "author": {
     "name": "Mark Rogers"

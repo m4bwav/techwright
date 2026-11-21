@@ -123,6 +123,24 @@ class Backup(unittest.TestCase):
         self.assertEqual(tech.restore_test(b, o)["restore_test"], "differs")
         self.assertEqual(tech.restore_test(os.path.join(d, "missing"))["restore_test"], "fail")
 
+    def test_failed_restore_overrides_verdict_and_exit(self):
+        # 0.1.0 printed "3-2-1 met" and exited 0 when the restore test could not find the file
+        import contextlib
+        import io
+        import tempfile
+        saved = (tech.IS_WIN, tech.run)
+        tech.IS_WIN = True
+        tech.run = lambda cmd, timeout=20: (0, '{"filehistory": "{}", "onedrive": true, "wbadmin": "x"}')
+        try:
+            with contextlib.redirect_stdout(io.StringIO()) as buf:
+                code = tech.main(["backup", "--json", "--restore-test",
+                                  os.path.join(tempfile.mkdtemp(), "missing.txt")])
+        finally:
+            tech.IS_WIN, tech.run = saved
+        self.assertEqual(code, 2)
+        self.assertIn('"verdict": "restore failed"', buf.getvalue())
+        self.assertIn("STOP: restore test failed", buf.getvalue())
+
 
 class Health(unittest.TestCase):
     def test_events_and_defender(self):

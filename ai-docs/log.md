@@ -1,2 +1,3 @@
 - 2026-11-21: repo created, research pass and scope plan written.
 - 2026-11-21 session 2: scripts/tech.py `net` (netsh/ipconfig/ping/DNS ladder -> verdict) and `disk` (Get-PhysicalDisk, reliability counters marked admin-needed, free space, STOP findings) + 7 fixture tests; live run on Mark's PC ok (wired, counters need admin).
+- 2026-11-21 session 3: backup + health, SKILL.md, references, plugin.json.

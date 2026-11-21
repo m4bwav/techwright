@@ -101,5 +101,36 @@ class Disk(unittest.TestCase):
         self.assertTrue(any("worn" in x for x in f) and any("airflow" in x for x in f))
 
 
+class Backup(unittest.TestCase):
+    def test_nothing_configured(self):
+        t, f, a = tech.backup_table({})
+        self.assertEqual(t["verdict"], "gaps")
+        self.assertTrue(any("off-site" in x for x in f))
+
+    def test_full_321(self):
+        t, f, a = tech.backup_table({"filehistory": "{}", "onedrive": True, "wbadmin": "ADMIN"})
+        self.assertEqual(t["verdict"], "3-2-1 met")
+        self.assertTrue(a)
+
+    def test_restore_pass_and_differs(self):
+        import tempfile
+        d = tempfile.mkdtemp()
+        b, o = os.path.join(d, "b.txt"), os.path.join(d, "o.txt")
+        open(b, "w").write("same")
+        open(o, "w").write("same")
+        self.assertEqual(tech.restore_test(b, o)["restore_test"], "pass")
+        open(o, "w").write("changed")
+        self.assertEqual(tech.restore_test(b, o)["restore_test"], "differs")
+        self.assertEqual(tech.restore_test(os.path.join(d, "missing"))["restore_test"], "fail")
+
+
+class Health(unittest.TestCase):
+    def test_events_and_defender(self):
+        f = tech.health_findings({"events": [{"key": "disk, 7", "Count": 3}, {"key": "Other, 1", "Count": 9}],
+                                  "defender": {"RealTimeProtectionEnabled": False, "AntivirusSignatureAge": 12}})
+        self.assertEqual(len(f), 3)
+        self.assertIn("STOP", f[0])
+
+
 if __name__ == "__main__":
     unittest.main()

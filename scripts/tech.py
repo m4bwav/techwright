@@ -3,6 +3,8 @@
 
   tech.py net  [--json]   Wi-Fi link, gateway, internet and DNS ladder -> verdict
   tech.py disk [--json]   physical disk health, reliability counters, free space
+  tech.py backup [--target D] [--restore-test F --original F]  3-2-1 table; restore test writes to temp only
+  tech.py health [--json] 7-day critical events, Defender, next checks
 
 Nothing here changes the machine. Probes that need admin are marked and skipped;
 fixes are printed as suggestions, never run.
@@ -207,6 +209,154 @@ def cmd_disk(args):
     return out
 
 
+BACKUP_PS = (
+    "$fh=$null; try { $fh=(Get-CimInstance -Namespace root/Microsoft/Windows/FileHistory "
+    "-ClassName MSFT_FhConfigInfo -ErrorAction Stop | Select-Object -First 1 | ConvertTo-Json -Compress) } catch {}; "
+    "$od=[bool]$env:OneDrive -and (Test-Path $env:OneDrive); "
+    "$wb=$null; $o=& wbadmin get versions 2>&1 | Out-String; if ($o -match 'denied|elevat') { $wb='ADMIN' } "
+    r"elseif ($o -match 'Backup time: ([^\r\n]+)') { $wb=$matches[1] }; "
+    "@{filehistory=$fh; onedrive=$od; onedrive_path=$env:OneDrive; wbadmin=$wb} | ConvertTo-Json -Compress"
+)
+
+
+def backup_table(state, extra_targets=()):
+    """state from BACKUP_PS (or a fixture) -> (table, findings, admin_needed).
+
+    A copy counts only when it is configured, not merely installed."""
+    copies = [{"copy": "original", "media": "this PC", "offsite": False}]
+    findings, admin = [], []
+    if state.get("filehistory"):
+        copies.append({"copy": "File History", "media": "external/network drive", "offsite": False})
+    if state.get("onedrive"):
+        copies.append({"copy": "OneDrive (synced folders)", "media": "cloud", "offsite": True})
+        findings.append("OneDrive sync is not a true backup: deletions and ransomware sync too. "
+                        "Count it off-site only after checking version history / Recycle Bin restore.")
+    wb = state.get("wbadmin")
+    if wb == "ADMIN":
+        admin.append("wbadmin system-image versions: rerun as admin")
+    elif wb:
+        copies.append({"copy": f"system image ({wb})", "media": "backup drive", "offsite": False})
+    for t in extra_targets:
+        copies.append({"copy": f"declared target {t}", "media": f"declared:{t}", "offsite": False})
+    n, media = len(copies), {c["media"] for c in copies}
+    off = any(c["offsite"] for c in copies)
+    if n < 3:
+        findings.append(f"Only {n} cop{'y' if n == 1 else 'ies'} found; 3-2-1 needs 3.")
+    if len(media) < 2:
+        findings.append("All copies sit on one kind of media; add an external drive or cloud.")
+    if not off:
+        findings.append("No off-site copy: fire, theft or ransomware takes everything. Add a cloud backup.")
+    verdict = "3-2-1 met" if n >= 3 and len(media) >= 2 and off else "gaps"
+    return {"verdict": verdict, "copies": copies}, findings, admin
+
+
+def sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+def restore_test(backup_copy, original=None):
+    """Copy one file out of the backup into a new temp dir and compare hashes. Writes only to temp."""
+    import os
+    import tempfile
+    if not os.path.isfile(backup_copy):
+        return {"restore_test": "fail", "reason": f"{backup_copy} is not a readable file in the backup"}
+    d = tempfile.mkdtemp(prefix="techwright-restore-")
+    dst = os.path.join(d, os.path.basename(backup_copy))
+    shutil.copy2(backup_copy, dst)
+    got = sha256(dst)
+    res = {"restore_test": "pass", "restored_to": dst, "sha256": got}
+    if got != sha256(backup_copy):
+        res.update(restore_test="fail", reason="restored copy differs from the backup copy")
+    elif original and os.path.isfile(original) and sha256(original) != got:
+        res.update(restore_test="differs",
+                   reason="restored file differs from the current original (changed since the backup?)")
+    return res
+
+
+def cmd_backup(args):
+    state = {}
+    if IS_WIN:
+        _, txt = run(["powershell", "-NoProfile", "-Command", BACKUP_PS], timeout=60)
+        try:
+            state = json.loads(txt[txt.index("{"):])
+        except ValueError:
+            state = {}
+    table, findings, admin = backup_table(state, args.target or [])
+    out = {**table, "findings": findings, "admin_needed": admin}
+    if args.restore_test:
+        out["restore"] = restore_test(args.restore_test, args.original)
+    else:
+        out["findings"].append("No restore tested: run tech.py backup --restore-test <file in backup> "
+                               "--original <same file on PC>. A backup never restored is a hope.")
+    return out
+
+
+HEALTH_PS = (
+    "$ev=@(Get-WinEvent -FilterHashtable @{LogName='System';Level=1,2;StartTime=(Get-Date).AddDays(-7)} "
+    "-MaxEvents 300 -ErrorAction SilentlyContinue | Group-Object ProviderName,Id | Sort-Object Count -Desc | "
+    "Select-Object -First 10 @{n='key';e={$_.Name}},Count); "
+    "$mp=$null; try { $mp=Get-MpComputerStatus -ErrorAction Stop | Select-Object AntivirusEnabled,"
+    "RealTimeProtectionEnabled,AntivirusSignatureAge } catch {}; "
+    "$bat=@(Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue).Count; "
+    "$up=$null; try { $up=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToString('o') } catch {}; "
+    "@{events=$ev; defender=$mp; batteries=$bat; last_boot=$up} | ConvertTo-Json -Depth 4 -Compress"
+)
+
+KNOWN_EVENTS = {
+    "Microsoft-Windows-Kernel-Power, 41": "unexpected shutdowns (power loss, PSU, overheating or a crash).",
+    "disk, 7": "STOP: bad blocks on a disk. Back up now, then run tech.py disk.",
+    "disk, 153": "disk I/O retries: check the cable or port, then tech.py disk.",
+    "Microsoft-Windows-WHEA-Logger, 1": "hardware error (WHEA): check temperatures, RAM and overclocks.",
+    "Microsoft-Windows-WHEA-Logger, 18": "fatal hardware error (WHEA): take it in if it repeats.",
+    "Microsoft-Windows-WindowsUpdateClient, 20": "Windows Update installs failing: Settings > Windows Update > "
+    "Update history shows the KB; run the Windows Update troubleshooter.",
+    "Ntfs, 55": "file system corruption: back up, then chkdsk (ask first; needs a reboot).",
+}
+
+
+def health_findings(data):
+    findings = []
+    ev = data.get("events") or []
+    if isinstance(ev, dict):
+        ev = [ev]
+    for e in ev:
+        note = KNOWN_EVENTS.get(e.get("key"))
+        if note:
+            findings.append(f"{e.get('key')} x{e.get('Count')}: {note}")
+    mp = data.get("defender")
+    if isinstance(mp, dict):
+        if not mp.get("RealTimeProtectionEnabled"):
+            findings.append("Defender real-time protection is off (fine only if another antivirus is active).")
+        if (mp.get("AntivirusSignatureAge") or 0) > 7:
+            findings.append(f"Defender signatures are {mp['AntivirusSignatureAge']} days old: run Windows Update.")
+    return findings
+
+
+def cmd_health(args):
+    if not IS_WIN:
+        return {"error": "health: only Windows is supported so far"}
+    _, txt = run(["powershell", "-NoProfile", "-Command", HEALTH_PS], timeout=90)
+    try:
+        data = json.loads(txt[txt.index("{"):])
+    except ValueError:
+        return {"error": "could not read event/Defender output"}
+    out = {"last_boot": data.get("last_boot"), "top_errors_7d": data.get("events"),
+           "defender": data.get("defender"), "findings": health_findings(data),
+           "next": ["tech.py disk for drive health"]}
+    if data.get("batteries"):
+        out["next"].append(r"powercfg /batteryreport /output %TEMP%\battery.html (writes one report file): "
+                           "design vs full-charge capacity")
+    if shutil.which("winget"):
+        out["next"].append("winget upgrade (lists pending app updates; install only with a yes)")
+    out["next"].append("For a scored all-round checkup use desktop-commander's computer-health-check if installed.")
+    return out
+
+
 def emit(res, as_json):
     if as_json:
         print(json.dumps(res, indent=2))
@@ -223,11 +373,15 @@ def emit(res, as_json):
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="tech.py", description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("net", "disk"):
-        s = sub.add_parser(name)
+    subs = {n: sub.add_parser(n) for n in ("net", "disk", "backup", "health")}
+    for s in subs.values():
         s.add_argument("--json", action="store_true")
+    b = subs["backup"]
+    b.add_argument("--target", action="append", help="a backup location you keep yourself (counted as a copy)")
+    b.add_argument("--restore-test", metavar="FILE", help="a file inside the backup to restore to temp")
+    b.add_argument("--original", metavar="FILE", help="the same file on this PC, to compare hashes")
     a = ap.parse_args(argv)
-    res = {"net": cmd_net, "disk": cmd_disk}[a.cmd](a)
+    res = {"net": cmd_net, "disk": cmd_disk, "backup": cmd_backup, "health": cmd_health}[a.cmd](a)
     emit(res, a.json)
     return 1 if "error" in res else 0
 

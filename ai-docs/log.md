@@ -1,0 +1,1 @@
+- 2026-11-21: repo created, research pass and scope plan written.

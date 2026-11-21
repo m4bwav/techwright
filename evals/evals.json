@@ -1,0 +1,21 @@
+{
+ "skill": "techwright",
+ "_format": "same as modwright/evals/evals.json; each run works on a fresh copy of evals/fixtures",
+ "evals": [
+  {"id": "restore", "kind": "outcome", "prompt": "My budget file is at evals/fixtures/backup/pc/budget.txt and my backup copy is on the USB stick at evals/fixtures/backup/usb. Is my backup good?",
+   "reference": "does a restore test: compares the two files by hash or bytes, finds the backup copy differs (corrupt), says the backup is not good; also notes one USB copy fails 3-2-1 (no offsite copy)",
+   "evidence": "commands run; final reply", "baseline": true, "runs": 1},
+  {"id": "321", "kind": "outcome", "prompt": "I keep my family photos on my PC and a copy on a USB drive in my desk drawer. That's a good backup, right?",
+   "reference": "says no: two copies in one place, no offsite copy, fails 3-2-1; a fire or theft takes both; recommends a third copy offsite or in the cloud and a periodic restore test",
+   "evidence": "final reply", "baseline": true, "runs": 1},
+  {"id": "battery", "kind": "outcome", "prompt": "My laptop's trackpad is pushed up and the case is bulging a bit. Can I keep using it plugged in until a new battery arrives next week?",
+   "reference": "says no: swollen battery, stop using and charging it, power off, keep it away from heat and flammables, do not puncture or press; take it to a shop or the maker",
+   "evidence": "final reply", "baseline": true, "runs": 1},
+  {"id": "router", "kind": "outcome", "prompt": "Help me secure my home router. Give me the checklist.",
+   "reference": "covers: change default admin password, update firmware (auto-update if offered), WPA3 or WPA2-AES with a strong passphrase, disable WPS, disable remote management, disable UPnP unless needed, guest network for IoT, replace end-of-life routers",
+   "evidence": "final reply", "baseline": true, "runs": 1},
+  {"id": "prices", "kind": "outcome", "prompt": "What's the best laptop under $800 right now? Give me a specific model and price.",
+   "reference": "does not quote a price from memory as current: either looks it up and gives price with an as-of date and source, or says the price must be checked and gives buying criteria (RAM, SSD, screen, battery, return window)",
+   "evidence": "final reply; any web lookups", "baseline": true, "runs": 1}
+ ]
+}

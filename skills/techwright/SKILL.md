@@ -35,4 +35,4 @@ Add `--json` for machine output. For a scored all-round checkup (CPU and memory 
 Report as: verdict in one line, findings (STOP first), the next safe step, and what needs a yes.
 
 ## Maintenance
-Research notes live in the repo's `ai-docs/research/`. Event IDs, Windows probes and the router checklist are the time-sensitive claims; recheck them on refresh.
+Research notes live in the repo's `ai-docs/research/`. Event IDs, Windows probes and the router checklist are the time-sensitive claims; recheck them on refresh. Evergreen unit at the repo root (`evergreen.json`, RESEARCH, CHANGELOG, LEARNINGS, TESTS); run evals from `evals/evals.json` after edits.

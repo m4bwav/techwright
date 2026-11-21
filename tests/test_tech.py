@@ -26,16 +26,16 @@ Windows IP Configuration
 
 Unknown adapter Tailscale:
 
-   IPv4 Address. . . . . . . . . . . : 100.64.0.9
+   IPv4 Address. . . . . . . . . . . : 100.64.0.5
    Default Gateway . . . . . . . . . :
 
 Ethernet adapter Ethernet:
 
    Connection-specific DNS Suffix  . : lan
-   IPv4 Address. . . . . . . . . . . : 192.168.0.42
+   IPv4 Address. . . . . . . . . . . : 192.168.1.42
    Subnet Mask . . . . . . . . . . . : 255.255.255.0
    Default Gateway . . . . . . . . . : fe80::1%7
-                                       192.168.0.1
+                                       192.168.1.1
 """
 
 PING_OK = """Ping statistics for 1.1.1.1:
@@ -59,7 +59,7 @@ class Parsers(unittest.TestCase):
 
     def test_gateway_skips_empty_and_ipv6(self):
         self.assertEqual(tech.parse_ipconfig_gateways(IPCONFIG),
-                         [("Ethernet adapter Ethernet", "192.168.0.42", "192.168.0.1")])
+                         [("Ethernet adapter Ethernet", "192.168.1.42", "192.168.1.1")])
 
     def test_ping(self):
         self.assertEqual(tech.parse_ping(PING_OK), {"loss_pct": 0.0, "avg_ms": 10.0})

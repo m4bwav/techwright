@@ -1,0 +1,16 @@
+{
+  "name": "techwright",
+  "owner": {
+    "name": "Mark Rogers"
+  },
+  "metadata": {
+    "description": "Home tech support for computers, Wi-Fi and gadgets"
+  },
+  "plugins": [
+    {
+      "name": "techwright",
+      "source": "./",
+      "description": "Symptom to cause with safe checks and a take-it-in stop, Wi-Fi and internet diagnosis, router hardening, a 3-2-1 backup check with a real restore test, drive and system health, dated buying advice and a safe homelab path"
+    }
+  ]
+}

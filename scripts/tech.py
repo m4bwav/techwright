@@ -290,6 +290,10 @@ def cmd_backup(args):
     out = {**table, "findings": findings, "admin_needed": admin}
     if args.restore_test:
         out["restore"] = restore_test(args.restore_test, args.original)
+        if out["restore"]["restore_test"] == "fail":
+            # A backup that cannot give a file back is not a backup, whatever the copy count says.
+            out["verdict"] = "restore failed"
+            out["findings"].insert(0, f"STOP: restore test failed: {out['restore']['reason']}.")
     else:
         out["findings"].append("No restore tested: run tech.py backup --restore-test <file in backup> "
                                "--original <same file on PC>. A backup never restored is a hope.")
@@ -383,7 +387,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
     res = {"net": cmd_net, "disk": cmd_disk, "backup": cmd_backup, "health": cmd_health}[a.cmd](a)
     emit(res, a.json)
-    return 1 if "error" in res else 0
+    if "error" in res:
+        return 1
+    return 2 if res.get("verdict") == "restore failed" else 0
 
 
 if __name__ == "__main__":

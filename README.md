@@ -2,7 +2,7 @@
 
 ![techwright banner](.github/images/banner.jpg)
 
-Home tech support for computers, Wi-Fi and gadgets. A Claude Code plugin with one skill and a standard-library script that only reads.
+Home tech support for computers, Wi-Fi and gadgets. An agent plugin with one skill and a standard-library script that only reads.
 
 - Symptom to likely cause, cheapest safe check first, and a clear "take it in" stop (swollen battery, burning smell, clicking drive with no backup).
 - Wi-Fi and internet: link, router, ISP or DNS, from one `tech.py net` ladder.
